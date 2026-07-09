@@ -24,12 +24,12 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 CODE_EXTENSIONS = {".c", ".h", ".cpp", ".hpp", ".cc", ".py", ".js", ".ts", ".java"}
 
 
-def _walk_and_record(root: Path, source_kind: str, source_ref: str) -> int:
-    """Walk a directory tree, recording each recognized source file."""
-    count = 0
+def _walk_and_record(root: Path, source_kind: str, source_ref: str) -> list[str]:
+    """Walk a directory tree, recording each recognized source file. Returns the new artifact ids."""
+    artifact_ids = []
     for path in root.rglob("*"):
         if path.is_file() and path.suffix.lower() in CODE_EXTENSIONS:
-            record_artifact(
+            artifact_id = record_artifact(
                 artifact_type="code",
                 source_kind=source_kind,
                 source_ref=source_ref,
@@ -38,14 +38,14 @@ def _walk_and_record(root: Path, source_kind: str, source_ref: str) -> int:
                 size_bytes=path.stat().st_size,
                 meta={"extension": path.suffix.lower()},
             )
-            count += 1
-    return count
+            artifact_ids.append(artifact_id)
+    return artifact_ids
 
 
-def ingest_local_code_folder(folder_path: str) -> int:
+def ingest_local_code_folder(folder_path: str) -> list[str]:
     """
     Register a local folder that already contains source code.
-    Returns the number of files recorded.
+    Returns the list of newly created artifact ids (len() gives the file count).
     """
     root = Path(folder_path).expanduser().resolve()
     if not root.exists() or not root.is_dir():
@@ -53,10 +53,10 @@ def ingest_local_code_folder(folder_path: str) -> int:
     return _walk_and_record(root, source_kind="local_folder", source_ref=str(root))
 
 
-def ingest_code_from_git_url(git_url: str, branch: str | None = None) -> int:
+def ingest_code_from_git_url(git_url: str, branch: str | None = None) -> list[str]:
     """
     Clone a git repository into the local data directory, then register its files.
-    Returns the number of files recorded.
+    Returns the list of newly created artifact ids (len() gives the file count).
 
     Requires `git` to be available on PATH. For private repos, embed credentials
     in the URL (https://<token>@github.com/org/repo.git) or configure a local

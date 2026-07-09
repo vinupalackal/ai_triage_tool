@@ -38,12 +38,12 @@ def _extract_html_text(html_bytes: bytes) -> str:
     return soup.get_text(separator="\n", strip=True)
 
 
-def ingest_uploaded_files(uploaded_files) -> int:
+def ingest_uploaded_files(uploaded_files) -> list[str]:
     """
     Register Streamlit UploadedFile objects (PDF or Markdown).
-    Returns the number of files recorded.
+    Returns the list of newly created artifact ids (len() gives the file count).
     """
-    count = 0
+    artifact_ids = []
     for uf in uploaded_files:
         raw_bytes = uf.read()
         suffix = Path(uf.name).suffix.lower()
@@ -58,7 +58,7 @@ def ingest_uploaded_files(uploaded_files) -> int:
         text_path = dest_path.with_suffix(dest_path.suffix + ".extracted.txt")
         text_path.write_text(text, encoding="utf-8")
 
-        record_artifact(
+        artifact_id = record_artifact(
             artifact_type="document",
             source_kind="upload",
             source_ref=uf.name,
@@ -67,14 +67,15 @@ def ingest_uploaded_files(uploaded_files) -> int:
             size_bytes=len(raw_bytes),
             meta={"extracted_text_path": str(text_path), "extension": suffix},
         )
-        count += 1
-    return count
+        artifact_ids.append(artifact_id)
+    return artifact_ids
 
 
-def ingest_doc_from_url(url: str) -> int:
+def ingest_doc_from_url(url: str) -> list[str]:
     """
     Fetch a document from a URL and register it, extracting text based on
-    content type (PDF, Markdown, or HTML). Returns 1 on success.
+    content type (PDF, Markdown, or HTML).
+    Returns a single-element list with the new artifact id on success.
     """
     resp = requests.get(url, timeout=30, headers={"User-Agent": "triage-poc/0.1"})
     resp.raise_for_status()
@@ -98,7 +99,7 @@ def ingest_doc_from_url(url: str) -> int:
     text_path = dest_path.with_suffix(dest_path.suffix + ".extracted.txt")
     text_path.write_text(text, encoding="utf-8")
 
-    record_artifact(
+    artifact_id = record_artifact(
         artifact_type="document",
         source_kind="url",
         source_ref=url,
@@ -111,4 +112,4 @@ def ingest_doc_from_url(url: str) -> int:
             "detected_as": "pdf" if is_pdf else ("markdown" if is_markdown else "html"),
         },
     )
-    return 1
+    return [artifact_id]

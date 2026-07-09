@@ -15,6 +15,7 @@ under [`docs/`](docs/). Start there for the *why*; this README covers the
 |---|---|---|
 | Ingestion (code, logs, docs — local and remote sources) | **Implemented** | [`ingestion/`](ingestion/) |
 | Tracking (shared artifact schema over DuckDB) | **Implemented** | [`utils/storage.py`](utils/storage.py) |
+| Component tagging + component → code/document map + ingestion cache | **Implemented** | [`utils/storage.py`](utils/storage.py), "Components" tab |
 | Investigate UI (question box, wired to the real agent interface) | **Implemented — UI only** | [`app.py`](app.py), "Investigate" tab |
 | Indexing (log templating, code chunking, doc embedding) | Designed, not yet built | [`indexing/`](indexing/) — stubs raise `NotImplementedError` |
 | Retrieval (hybrid vector + keyword + graph search) | Designed, not yet built | [`retrieval/`](retrieval/) — stubs raise `NotImplementedError` |
@@ -24,6 +25,26 @@ The "Investigate" tab in the running app calls the real `agent.loop.investigate(
 interface today — it currently surfaces a clear "not yet built" message
 instead of an answer, plus the six tools the agent will use once it's wired
 up, so the app's visible shape already matches its full intended scope.
+
+### Component tagging and the ingestion cache
+
+When ingesting source code or documents, you can tag what you're ingesting
+with one or more component names (comma-separated, e.g. `Tuner, Wi-Fi` for
+shared code). This does two things:
+
+1. **It's the component → document/code map.** The "Components" tab lets
+   you pick a component and see every code file and document tagged with
+   it, in one place.
+2. **It backs a real ingestion cache.** If every component you enter already
+   has data of that type tracked (e.g. you already ingested code tagged
+   `Tuner`), a second ingestion attempt for `Tuner` skips the actual git
+   clone / folder scan / document fetch entirely and reads the existing
+   rows straight from the tracking database instead — visible in the UI as
+   a "Cache hit" message. Check "Force refresh" to bypass the cache and
+   re-ingest anyway (e.g. after the underlying repo has new commits).
+
+This is optional — leaving the component field blank ingests and tags
+nothing, exactly as before this feature was added.
 
 The stub modules aren't placeholders in the "TODO" sense — their function
 signatures, inputs, and outputs are the actual interface contract defined in
@@ -71,7 +92,7 @@ design → code.
 ## Repository layout
 
 ```
-app.py                  Streamlit entry point (3 ingestion tabs, Investigate tab, artifact browser)
+app.py                  Streamlit entry point (3 ingestion tabs, Components tab, Investigate tab, artifact browser)
 ingestion/               Implemented — provisions code, logs, and docs
   code_ingest.py           local folder OR git URL (clones)
   log_ingest.py            local folder OR Jira issue URL (downloads attachments)

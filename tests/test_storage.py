@@ -66,3 +66,62 @@ def test_mark_indexed_is_idempotent():
 
     unindexed = storage.get_unindexed_artifacts("log", "log_signatures")
     assert len(unindexed) == 0  # still excluded, not duplicated
+
+
+def test_tag_components_supports_multiple_components_on_one_artifact():
+    artifact_id = storage.record_artifact(
+        "code", "git_url", "https://x/repo.git", "/tmp/lock.c", "lock.c", 100
+    )
+    storage.tag_components(artifact_id, ["Tuner", "Wi-Fi"])
+
+    assert storage.get_components_for_artifact(artifact_id) == ["Tuner", "Wi-Fi"]
+
+
+def test_tag_components_is_idempotent():
+    artifact_id = storage.record_artifact(
+        "code", "local_folder", "/tmp", "/tmp/a.c", "a.c", 10
+    )
+    storage.tag_components(artifact_id, ["Tuner"])
+    storage.tag_components(artifact_id, ["Tuner"])  # re-tag, should not duplicate
+
+    assert storage.get_components_for_artifact(artifact_id) == ["Tuner"]
+
+
+def test_get_artifacts_by_component_maps_code_and_documents_separately():
+    code_id = storage.record_artifact(
+        "code", "git_url", "https://x/repo.git", "/tmp/lock.c", "lock.c", 100
+    )
+    doc_id = storage.record_artifact(
+        "document", "upload", "spec.pdf", "/tmp/spec.pdf", "spec.pdf", 200
+    )
+    storage.tag_components(code_id, ["Tuner"])
+    storage.tag_components(doc_id, ["Tuner"])
+
+    tuner_code = storage.get_artifacts_by_component("Tuner", "code")
+    tuner_docs = storage.get_artifacts_by_component("Tuner", "document")
+    wifi_docs = storage.get_artifacts_by_component("Wi-Fi", "document")
+
+    assert len(tuner_code) == 1
+    assert len(tuner_docs) == 1
+    assert len(wifi_docs) == 0  # untagged component returns nothing, not an error
+
+
+def test_list_known_components_returns_distinct_sorted_names():
+    id1 = storage.record_artifact("code", "local_folder", "/tmp", "/tmp/a.c", "a.c", 10)
+    id2 = storage.record_artifact("code", "local_folder", "/tmp", "/tmp/b.c", "b.c", 10)
+    storage.tag_components(id1, ["Wi-Fi"])
+    storage.tag_components(id2, ["Tuner", "Wi-Fi"])  # Wi-Fi repeated on purpose
+
+    assert storage.list_known_components() == ["Tuner", "Wi-Fi"]
+
+
+def test_component_cache_available_reflects_actual_data():
+    assert storage.component_cache_available("Tuner", "code") is False
+
+    artifact_id = storage.record_artifact(
+        "code", "local_folder", "/tmp", "/tmp/a.c", "a.c", 10
+    )
+    storage.tag_components(artifact_id, ["Tuner"])
+
+    assert storage.component_cache_available("Tuner", "code") is True
+    assert storage.component_cache_available("Tuner", "document") is False  # type-specific

@@ -149,3 +149,118 @@ def mark_indexed(artifact_id: str, index_table: str, index_id: str):
         [artifact_id, index_table, index_id, datetime.now(timezone.utc)],
     )
     con.close()
+
+
+# ---------------------------------------------------------------------------
+# Component tagging, component -> artifact mapping, and the ingestion cache
+# ---------------------------------------------------------------------------
+#
+# A "component" here is the same concept as the `component` field in the
+# shared identifier schema (Requirements Specification, Section 8.2) — a
+# subsystem name like "Tuner" or "Wi-Fi". Source code and documents are
+# tagged with one or more components at ingestion time. This mapping serves
+# two purposes:
+#
+#   1. It IS the component -> documents (and component -> code) lookup —
+#      get_artifacts_by_component() answers "what do we have for Tuner?"
+#      across both code and documents with the same function.
+#   2. It backs the ingestion cache: if a component already has code (or
+#      document) artifacts tracked, ingestion for that component/type can be
+#      skipped entirely and the caller reads the existing rows instead of
+#      re-cloning a repo or re-fetching documents.
+
+def _ensure_component_table(con):
+    """Internal: create the artifact<->component mapping table if needed."""
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS artifact_components (
+            artifact_id VARCHAR,
+            component VARCHAR,
+            tagged_at TIMESTAMP,
+            PRIMARY KEY (artifact_id, component)
+        )
+        """
+    )
+
+
+def tag_components(artifact_id: str, components: list[str]):
+    """
+    Associate an artifact (a code file or a document) with one or more
+    components. Safe to call repeatedly — re-tagging with the same
+    component is a no-op, not a duplicate row.
+    """
+    con = get_connection()
+    _ensure_component_table(con)
+    now = datetime.now(timezone.utc)
+    for component in components:
+        component = component.strip()
+        if not component:
+            continue
+        con.execute(
+            """
+            INSERT INTO artifact_components VALUES (?, ?, ?)
+            ON CONFLICT (artifact_id, component) DO NOTHING
+            """,
+            [artifact_id, component, now],
+        )
+    con.close()
+
+
+def get_components_for_artifact(artifact_id: str) -> list[str]:
+    """Return every component a given artifact has been tagged with."""
+    con = get_connection()
+    _ensure_component_table(con)
+    df = con.execute(
+        "SELECT component FROM artifact_components WHERE artifact_id = ? ORDER BY component",
+        [artifact_id],
+    ).fetchdf()
+    con.close()
+    return list(df["component"]) if not df.empty else []
+
+
+def get_artifacts_by_component(component: str, artifact_type: str | None = None):
+    """
+    The component -> artifact mapping lookup. Returns every artifact (code
+    file or document, or both) tagged with the given component, newest first.
+    This is what a UI or the retrieval layer calls to answer "what code and
+    documents do we have for the Tuner component?"
+    """
+    con = get_connection()
+    _ensure_component_table(con)
+    query = """
+        SELECT a.* FROM artifacts a
+        JOIN artifact_components c ON a.id = c.artifact_id
+        WHERE c.component = ?
+    """
+    params = [component]
+    if artifact_type:
+        query += " AND a.artifact_type = ?"
+        params.append(artifact_type)
+    query += " ORDER BY a.ingested_at DESC"
+    df = con.execute(query, params).fetchdf()
+    con.close()
+    return df
+
+
+def list_known_components() -> list[str]:
+    """All distinct component names tagged so far, for populating a picker."""
+    con = get_connection()
+    _ensure_component_table(con)
+    df = con.execute(
+        "SELECT DISTINCT component FROM artifact_components ORDER BY component"
+    ).fetchdf()
+    con.close()
+    return list(df["component"]) if not df.empty else []
+
+
+def component_cache_available(component: str, artifact_type: str) -> bool:
+    """
+    The cache check: does this component already have at least one artifact
+    of the given type tracked? If True, the caller should skip re-running
+    ingestion (re-cloning a repo, re-downloading/re-extracting a document)
+    and instead read the existing rows via get_artifacts_by_component() —
+    the "respective database" the cached data already lives in.
+    """
+    df = get_artifacts_by_component(component, artifact_type)
+    return not df.empty
+

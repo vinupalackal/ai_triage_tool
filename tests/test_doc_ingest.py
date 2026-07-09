@@ -65,8 +65,8 @@ def test_ingest_uploaded_files_registers_and_extracts(monkeypatch, tmp_path):
     pdf_bytes = _make_test_pdf_bytes("Hello from a test PDF")
     uploaded = [_FakeUploadedFile("spec.pdf", pdf_bytes)]
 
-    count = doc_ingest.ingest_uploaded_files(uploaded)
-    assert count == 1
+    artifact_ids = doc_ingest.ingest_uploaded_files(uploaded)
+    assert len(artifact_ids) == 1
 
     df = storage.list_artifacts("document")
     assert len(df) == 1

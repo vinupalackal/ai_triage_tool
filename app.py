@@ -19,13 +19,42 @@ that happens to be implemented first.
 """
 
 import streamlit as st
+import pandas as pd
 
 from ingestion.code_ingest import ingest_local_code_folder, ingest_code_from_git_url
 from ingestion.log_ingest import ingest_local_log_folder, ingest_logs_from_jira
 from ingestion.doc_ingest import ingest_uploaded_files, ingest_doc_from_url
-from utils.storage import list_artifacts, artifact_counts
+from utils.storage import (
+    list_artifacts,
+    artifact_counts,
+    tag_components,
+    get_artifacts_by_component,
+    list_known_components,
+    component_cache_available,
+)
 from agent.tools import TOOL_DEFINITIONS
 from agent.loop import investigate
+
+
+def _parse_components(raw: str) -> list[str]:
+    """Split a comma-separated component input into a clean list, e.g. 'Tuner, Wi-Fi' -> ['Tuner', 'Wi-Fi']."""
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
+def _cached_artifacts_for_components(components: list[str], artifact_type: str) -> pd.DataFrame:
+    """Union of existing artifacts across all given components, for displaying a cache hit."""
+    frames = [get_artifacts_by_component(c, artifact_type) for c in components]
+    frames = [f for f in frames if not f.empty]
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames).drop_duplicates(subset="id")
+
+
+def _all_components_cached(components: list[str], artifact_type: str) -> bool:
+    """Cache hit only when every requested component already has data of this type."""
+    return bool(components) and all(
+        component_cache_available(c, artifact_type) for c in components
+    )
 
 st.set_page_config(page_title="Triage MVP", layout="wide")
 
@@ -43,8 +72,8 @@ c1.metric("Code files", counts.get("code", 0))
 c2.metric("Log files", counts.get("log", 0))
 c3.metric("Documents", counts.get("document", 0))
 
-tab_code, tab_logs, tab_docs, tab_investigate, tab_browse = st.tabs(
-    ["Source code", "Logs", "Documents", "Investigate", "Ingested artifacts"]
+tab_code, tab_logs, tab_docs, tab_components, tab_investigate, tab_browse = st.tabs(
+    ["Source code", "Logs", "Documents", "Components", "Investigate", "Ingested artifacts"]
 )
 
 # ----------------------------------------------------------------------
@@ -52,6 +81,21 @@ tab_code, tab_logs, tab_docs, tab_investigate, tab_browse = st.tabs(
 # ----------------------------------------------------------------------
 with tab_code:
     st.subheader("Add source code")
+
+    code_components_raw = st.text_input(
+        "Component name(s) — comma-separated if the code serves more than one "
+        "(e.g. shared utility code used by both Tuner and Wi-Fi)",
+        placeholder="Tuner, Wi-Fi",
+        key="code_components_input",
+    )
+    code_components = _parse_components(code_components_raw)
+    code_force_refresh = st.checkbox(
+        "Force refresh (ignore cache and re-ingest even if this component is already cached)",
+        key="code_force_refresh",
+    )
+    if code_components:
+        st.caption(f"Will tag ingested files with: {', '.join(code_components)}")
+
     mode = st.radio(
         "Where is the code coming from?",
         ["Local folder", "Git URL"],
@@ -68,11 +112,23 @@ with tab_code:
         if st.button("Ingest code folder", key="code_folder_btn"):
             if not folder:
                 st.warning("Enter a folder path first.")
+            elif code_components and not code_force_refresh and _all_components_cached(code_components, "code"):
+                cached = _cached_artifacts_for_components(code_components, "code")
+                st.info(
+                    f"Cache hit — {len(cached)} code file(s) already ingested for "
+                    f"component(s) {', '.join(code_components)}. Skipping "
+                    f"re-ingestion and reading from the tracking database "
+                    f"instead. Check \"Force refresh\" above to re-ingest anyway."
+                )
+                st.dataframe(cached[["display_name", "source_kind", "ingested_at"]], use_container_width=True)
             else:
                 try:
                     with st.spinner("Scanning folder..."):
-                        n = ingest_local_code_folder(folder)
-                    st.success(f"Registered {n} source files from {folder}.")
+                        artifact_ids = ingest_local_code_folder(folder)
+                        if code_components:
+                            for aid in artifact_ids:
+                                tag_components(aid, code_components)
+                    st.success(f"Registered {len(artifact_ids)} source files from {folder}.")
                 except Exception as e:
                     st.error(str(e))
 
@@ -93,11 +149,23 @@ with tab_code:
         if st.button("Clone and ingest", key="code_git_btn"):
             if not git_url:
                 st.warning("Enter a git URL first.")
+            elif code_components and not code_force_refresh and _all_components_cached(code_components, "code"):
+                cached = _cached_artifacts_for_components(code_components, "code")
+                st.info(
+                    f"Cache hit — {len(cached)} code file(s) already ingested for "
+                    f"component(s) {', '.join(code_components)}. Skipping the "
+                    f"git clone and reading from the tracking database instead. "
+                    f"Check \"Force refresh\" above to re-clone anyway."
+                )
+                st.dataframe(cached[["display_name", "source_kind", "ingested_at"]], use_container_width=True)
             else:
                 try:
                     with st.spinner(f"Cloning {git_url}..."):
-                        n = ingest_code_from_git_url(git_url, branch or None)
-                    st.success(f"Cloned and registered {n} source files.")
+                        artifact_ids = ingest_code_from_git_url(git_url, branch or None)
+                        if code_components:
+                            for aid in artifact_ids:
+                                tag_components(aid, code_components)
+                    st.success(f"Cloned and registered {len(artifact_ids)} source files.")
                 except Exception as e:
                     st.error(str(e))
 
@@ -172,6 +240,21 @@ with tab_logs:
 # ----------------------------------------------------------------------
 with tab_docs:
     st.subheader("Add documents")
+
+    doc_components_raw = st.text_input(
+        "Component name(s) — comma-separated if this document covers more than one "
+        "(e.g. a shared platform spec)",
+        placeholder="Tuner",
+        key="doc_components_input",
+    )
+    doc_components = _parse_components(doc_components_raw)
+    doc_force_refresh = st.checkbox(
+        "Force refresh (ignore cache and re-ingest even if this component is already cached)",
+        key="doc_force_refresh",
+    )
+    if doc_components:
+        st.caption(f"Will tag ingested documents with: {', '.join(doc_components)}")
+
     mode = st.radio(
         "Where are the documents coming from?",
         ["Upload files", "URL"],
@@ -189,11 +272,23 @@ with tab_docs:
         if st.button("Ingest uploaded files", key="doc_upload_btn"):
             if not uploaded:
                 st.warning("Upload at least one file first.")
+            elif doc_components and not doc_force_refresh and _all_components_cached(doc_components, "document"):
+                cached = _cached_artifacts_for_components(doc_components, "document")
+                st.info(
+                    f"Cache hit — {len(cached)} document(s) already ingested for "
+                    f"component(s) {', '.join(doc_components)}. Skipping "
+                    f"re-processing and reading from the tracking database "
+                    f"instead. Check \"Force refresh\" above to re-ingest anyway."
+                )
+                st.dataframe(cached[["display_name", "source_kind", "ingested_at"]], use_container_width=True)
             else:
                 try:
                     with st.spinner("Extracting text..."):
-                        n = ingest_uploaded_files(uploaded)
-                    st.success(f"Registered {n} documents.")
+                        artifact_ids = ingest_uploaded_files(uploaded)
+                        if doc_components:
+                            for aid in artifact_ids:
+                                tag_components(aid, doc_components)
+                    st.success(f"Registered {len(artifact_ids)} documents.")
                 except Exception as e:
                     st.error(str(e))
 
@@ -207,13 +302,70 @@ with tab_docs:
         if st.button("Fetch and ingest", key="doc_url_btn"):
             if not doc_url:
                 st.warning("Enter a URL first.")
+            elif doc_components and not doc_force_refresh and _all_components_cached(doc_components, "document"):
+                cached = _cached_artifacts_for_components(doc_components, "document")
+                st.info(
+                    f"Cache hit — {len(cached)} document(s) already ingested for "
+                    f"component(s) {', '.join(doc_components)}. Skipping the "
+                    f"fetch and reading from the tracking database instead. "
+                    f"Check \"Force refresh\" above to re-fetch anyway."
+                )
+                st.dataframe(cached[["display_name", "source_kind", "ingested_at"]], use_container_width=True)
             else:
                 try:
                     with st.spinner(f"Fetching {doc_url}..."):
-                        ingest_doc_from_url(doc_url)
+                        artifact_ids = ingest_doc_from_url(doc_url)
+                        if doc_components:
+                            for aid in artifact_ids:
+                                tag_components(aid, doc_components)
                     st.success("Document fetched, extracted, and registered.")
                 except Exception as e:
                     st.error(str(e))
+
+# ----------------------------------------------------------------------
+# COMPONENTS  (the component -> code / document mapping lookup)
+# ----------------------------------------------------------------------
+with tab_components:
+    st.subheader("Component map")
+    st.caption(
+        "Look up every code file and document tagged with a given component. "
+        "This is the same mapping the cache-skip logic in the Source code and "
+        "Documents tabs uses internally."
+    )
+
+    known = list_known_components()
+    if not known:
+        st.info(
+            "No components tagged yet — enter a component name when ingesting "
+            "source code or documents in the tabs above."
+        )
+    else:
+        selected = st.selectbox("Component", known, key="component_lookup_select")
+        if selected:
+            code_df = get_artifacts_by_component(selected, "code")
+            doc_df = get_artifacts_by_component(selected, "document")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Source code** ({len(code_df)})")
+                if code_df.empty:
+                    st.caption("None tagged with this component yet.")
+                else:
+                    st.dataframe(
+                        code_df[["display_name", "source_kind", "ingested_at"]],
+                        use_container_width=True,
+                    )
+            with col2:
+                st.markdown(f"**Documents** ({len(doc_df)})")
+                if doc_df.empty:
+                    st.caption("None tagged with this component yet.")
+                else:
+                    st.dataframe(
+                        doc_df[["display_name", "source_kind", "ingested_at"]],
+                        use_container_width=True,
+                    )
+
+
 
 # ----------------------------------------------------------------------
 # INVESTIGATE  (agent layer — designed, not yet built)

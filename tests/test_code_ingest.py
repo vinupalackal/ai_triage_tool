@@ -24,8 +24,9 @@ def test_ingest_local_code_folder_registers_recognized_files(tmp_path):
     (tmp_path / "lock.h").write_text("int tuner_lock_retry(int freq);\n")
     (tmp_path / "notes.docx").write_bytes(b"not a source file")  # should be skipped
 
-    count = code_ingest.ingest_local_code_folder(str(tmp_path))
-    assert count == 2
+    artifact_ids = code_ingest.ingest_local_code_folder(str(tmp_path))
+    assert len(artifact_ids) == 2
+    assert all(isinstance(a, str) for a in artifact_ids)
 
     df = storage.list_artifacts("code")
     names = set(df["display_name"])
@@ -40,9 +41,9 @@ def test_ingest_local_code_folder_rejects_invalid_path():
 @pytest.mark.network
 def test_ingest_code_from_git_url_clones_and_registers():
     # A small, stable public repo used only to verify the clone+walk mechanics.
-    count = code_ingest.ingest_code_from_git_url(
+    artifact_ids = code_ingest.ingest_code_from_git_url(
         "https://github.com/octocat/Hello-World.git"
     )
     # This particular repo has no matching source extensions — the assertion
     # that matters is that the clone succeeded without raising.
-    assert count >= 0
+    assert isinstance(artifact_ids, list)
