@@ -72,9 +72,68 @@ c1.metric("Code files", counts.get("code", 0))
 c2.metric("Log files", counts.get("log", 0))
 c3.metric("Documents", counts.get("document", 0))
 
-tab_code, tab_logs, tab_docs, tab_components, tab_investigate, tab_browse = st.tabs(
-    ["Source code", "Logs", "Documents", "Components", "Investigate", "Ingested artifacts"]
+tab_investigate, tab_code, tab_logs, tab_docs, tab_components, tab_browse = st.tabs(
+    ["Investigate", "Source code", "Logs", "Documents", "Components", "Ingested artifacts"]
 )
+
+# ----------------------------------------------------------------------
+# INVESTIGATE  (agent layer — designed, not yet built)
+# ----------------------------------------------------------------------
+with tab_investigate:
+    st.subheader("Ask a question")
+    st.caption(
+        "This calls the real agent interface designed in the High-Level "
+        "Design (Section 3.5) — it isn't wired up to working indexing and "
+        "retrieval yet, so it will tell you that rather than return an "
+        "answer. The shape below is what it will look like once built."
+    )
+
+    total_artifacts = sum(counts.values())
+    if total_artifacts == 0:
+        st.warning(
+            "Nothing has been ingested yet — add source code, logs, or "
+            "documents in the tabs below before running an investigation."
+        )
+
+    question = st.text_area(
+        "Question",
+        placeholder=(
+            "Why does the XR400 reboot a few minutes after standby on "
+            "firmware RDKV-4.2.118?"
+        ),
+        key="investigate_question",
+    )
+
+    if st.button("Run investigation", key="investigate_btn", type="primary"):
+        if not question:
+            st.warning("Enter a question first.")
+        else:
+            try:
+                with st.spinner("Investigating..."):
+                    result = investigate(question)
+                # This branch is unreachable until agent.loop.investigate is
+                # implemented, but is written now so wiring up real results
+                # later is a matter of filling this in, not designing it.
+                st.success("Proposed root cause")
+                st.write(result.proposed_root_cause)
+                st.caption(f"Cited artifacts: {result.cited_artifact_ids}")
+            except NotImplementedError:
+                st.info(
+                    "The agent layer is designed but not yet built — see "
+                    "`docs/design/Triage_MVP_High_Level_Design.docx`, "
+                    "Section 3.5, and `agent/loop.py`. Once the indexing "
+                    "and retrieval layers are implemented, this button "
+                    "will run the full investigation loop below."
+                )
+
+    with st.expander("What this will do, once built"):
+        st.markdown(
+            "The agent runs a **reason → act → observe** loop against your "
+            "question, calling these tools as needed and citing exactly "
+            "what it used to reach its answer:"
+        )
+        for tool in TOOL_DEFINITIONS:
+            st.markdown(f"- **{tool['name']}** — {tool['description']}")
 
 # ----------------------------------------------------------------------
 # SOURCE CODE
@@ -364,67 +423,6 @@ with tab_components:
                         doc_df[["display_name", "source_kind", "ingested_at"]],
                         use_container_width=True,
                     )
-
-
-
-# ----------------------------------------------------------------------
-# INVESTIGATE  (agent layer — designed, not yet built)
-# ----------------------------------------------------------------------
-with tab_investigate:
-    st.subheader("Ask a question")
-    st.caption(
-        "This calls the real agent interface designed in the High-Level "
-        "Design (Section 3.5) — it isn't wired up to working indexing and "
-        "retrieval yet, so it will tell you that rather than return an "
-        "answer. The shape below is what it will look like once built."
-    )
-
-    total_artifacts = sum(counts.values())
-    if total_artifacts == 0:
-        st.warning(
-            "Nothing has been ingested yet — add source code, logs, or "
-            "documents in the tabs above before running an investigation."
-        )
-
-    question = st.text_area(
-        "Question",
-        placeholder=(
-            "Why does the XR400 reboot a few minutes after standby on "
-            "firmware RDKV-4.2.118?"
-        ),
-        key="investigate_question",
-    )
-
-    if st.button("Run investigation", key="investigate_btn", type="primary"):
-        if not question:
-            st.warning("Enter a question first.")
-        else:
-            try:
-                with st.spinner("Investigating..."):
-                    result = investigate(question)
-                # This branch is unreachable until agent.loop.investigate is
-                # implemented, but is written now so wiring up real results
-                # later is a matter of filling this in, not designing it.
-                st.success("Proposed root cause")
-                st.write(result.proposed_root_cause)
-                st.caption(f"Cited artifacts: {result.cited_artifact_ids}")
-            except NotImplementedError:
-                st.info(
-                    "The agent layer is designed but not yet built — see "
-                    "`docs/design/Triage_MVP_High_Level_Design.docx`, "
-                    "Section 3.5, and `agent/loop.py`. Once the indexing "
-                    "and retrieval layers are implemented, this button "
-                    "will run the full investigation loop below."
-                )
-
-    with st.expander("What this will do, once built"):
-        st.markdown(
-            "The agent runs a **reason → act → observe** loop against your "
-            "question, calling these tools as needed and citing exactly "
-            "what it used to reach its answer:"
-        )
-        for tool in TOOL_DEFINITIONS:
-            st.markdown(f"- **{tool['name']}** — {tool['description']}")
 
 
 with tab_browse:

@@ -11,8 +11,8 @@ handling shows the expected message rather than crashing.
 import pytest
 from streamlit.testing.v1 import AppTest
 
-# Tab order: Source code, Logs, Documents, Components, Investigate, Ingested artifacts
-SOURCE_CODE_TAB, LOGS_TAB, DOCS_TAB, COMPONENTS_TAB, INVESTIGATE_TAB, BROWSE_TAB = range(6)
+# Tab order: Investigate, Source code, Logs, Documents, Components, Ingested artifacts
+INVESTIGATE_TAB, SOURCE_CODE_TAB, LOGS_TAB, DOCS_TAB, COMPONENTS_TAB, BROWSE_TAB = range(6)
 
 
 @pytest.fixture

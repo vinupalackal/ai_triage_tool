@@ -92,7 +92,7 @@ design → code.
 ## Repository layout
 
 ```
-app.py                  Streamlit entry point (3 ingestion tabs, Components tab, Investigate tab, artifact browser)
+app.py                  Streamlit entry point — tabs: Investigate, Source code, Logs, Documents, Components, Ingested artifacts
 ingestion/               Implemented — provisions code, logs, and docs
   code_ingest.py           local folder OR git URL (clones)
   log_ingest.py            local folder OR Jira issue URL (downloads attachments)
