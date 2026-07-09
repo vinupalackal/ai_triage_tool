@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Teaching an AI to Find Bugs: A Beginner's Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F5F6F3;
+    --panel:#FFFFFF;
+    --ink:#161B22;
+    --ink-soft:#4A5260;
+    --line:#DDE1DA;
+    --code-color:#1F6F63;      /* teal — source code stream */
+    --code-tint:#E4F1EE;
+    --log-color:#3A4D8F;       /* slate blue — log stream */
+    --log-tint:#E7EAF6;
+    --doc-color:#B8802E;       /* ochre/gold — document stream */
+    --doc-tint:#F7ECD9;
+    --danger:#B24545;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.65;
+    font-size:16.5px;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:0 28px 120px;}
+  h1,h2,h3,h4{font-family:'Fraunces',serif;font-weight:600;line-height:1.15;color:var(--ink);}
+  h1{font-size:clamp(2.2rem,5vw,3.4rem);font-weight:700;letter-spacing:-0.01em;}
+  h2{font-size:1.9rem;margin-top:0;}
+  h3{font-size:1.25rem;margin-bottom:0.4em;}
+  p{margin:0 0 1em;}
+  code, .mono{font-family:'IBM Plex Mono',monospace;font-size:0.88em;}
+  code{background:#EEEFEA;padding:0.1em 0.4em;border-radius:4px;}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    padding:88px 0 40px;
+    border-bottom:1px solid var(--line);
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.78rem;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    display:flex;align-items:center;gap:10px;
+    margin-bottom:18px;
+  }
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--code-color);}
+  .eyebrow .dot:nth-child(3){background:var(--log-color);}
+  .eyebrow .dot:nth-child(4){background:var(--doc-color);}
+  .lede{font-size:1.2rem;color:var(--ink-soft);max-width:620px;margin-top:14px;}
+
+  /* ---------- SECTION shell ---------- */
+  section{padding:64px 0;border-bottom:1px solid var(--line);}
+  section:last-of-type{border-bottom:none;}
+  .kicker{
+    font-family:'IBM Plex Mono',monospace;font-size:0.78rem;letter-spacing:0.1em;
+    text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;
+  }
+
+  /* ---------- ANALOGY / CALLOUT boxes ---------- */
+  .callout{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-left:4px solid var(--code-color);
+    border-radius:6px;
+    padding:20px 22px;
+    margin:22px 0;
+  }
+  .callout.log{border-left-color:var(--log-color);}
+  .callout.doc{border-left-color:var(--doc-color);}
+  .callout .label{
+    font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;
+    letter-spacing:0.08em;color:var(--ink-soft);margin-bottom:6px;display:block;
+  }
+
+  /* ---------- glossary cards ---------- */
+  .glossary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0;}
+  @media(max-width:640px){.glossary{grid-template-columns:1fr;}}
+  .term{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px;
+  }
+  .term h4{font-family:'IBM Plex Mono',monospace;font-size:0.95rem;color:var(--code-color);margin:0 0 6px;text-transform:none;}
+  .term p{margin:0;font-size:0.94rem;color:var(--ink-soft);}
+
+  /* ---------- data-type cards ---------- */
+  .stream-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:26px 26px 22px;margin:26px 0;position:relative;overflow:hidden;
+  }
+  .stream-card::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:5px;
+  }
+  .stream-card.code::before{background:var(--code-color);}
+  .stream-card.log::before{background:var(--log-color);}
+  .stream-card.doc::before{background:var(--doc-color);}
+  .stream-card h3{display:flex;align-items:center;gap:10px;}
+  .swatch{width:11px;height:11px;border-radius:3px;display:inline-block;}
+  .swatch.code{background:var(--code-color);}
+  .swatch.log{background:var(--log-color);}
+  .swatch.doc{background:var(--doc-color);}
+
+  /* ---------- diagram frame ---------- */
+  .diagram{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:18px;margin:26px 0;
+  }
+  .diagram .cap{
+    font-family:'IBM Plex Mono',monospace;font-size:0.76rem;color:var(--ink-soft);
+    text-align:center;margin-top:10px;
+  }
+  svg{display:block;width:100%;height:auto;}
+
+  /* ---------- walkthrough steps ---------- */
+  .steps{counter-reset:step;margin:26px 0;}
+  .step{
+    display:grid;grid-template-columns:44px 1fr;gap:16px;margin-bottom:22px;position:relative;
+  }
+  .step::before{
+    counter-increment:step;content:counter(step);
+    width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--paper);
+    display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;
+  }
+  .step h4{margin:2px 0 4px;font-family:'Inter',sans-serif;font-weight:700;font-size:1rem;}
+  .step p{margin:0;color:var(--ink-soft);font-size:0.96rem;}
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;margin:20px 0;font-size:0.92rem;}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);}
+
+  ul,ol{padding-left:22px;}
+  li{margin-bottom:8px;}
+
+  .badge{
+    display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;
+    padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;
+  }
+  .badge.code{background:var(--code-tint);color:var(--code-color);}
+  .badge.log{background:var(--log-tint);color:var(--log-color);}
+  .badge.doc{background:var(--doc-tint);color:var(--doc-color);}
+
+  footer{padding:40px 0 20px;color:var(--ink-soft);font-size:0.85rem;}
+
+  @media print{
+    body{background:#FFFFFF;}
+    .wrap{max-width:100%;}
+    .diagram, .callout, .stream-card, .term, .step, table, .glossary{
+      page-break-inside:avoid; break-inside:avoid;
+    }
+    h1,h2,h3,h4{page-break-after:avoid; break-after:avoid;}
+    section{page-break-inside:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= HERO ================= -->
+  <div class="hero">
+    <div class="eyebrow"><span class="dot"></span> CODE <span class="dot"></span> LOGS <span class="dot"></span> DOCS</div>
+    <h1>Teaching an AI to find bugs</h1>
+    <p class="lede">A plain-English walkthrough of how to store source code, device logs, and documents so an AI can connect them — and point at the actual line of code that's broken.</p>
+    <p class="lede" style="margin-top:8px;">No prior AI background needed. Every term is explained the first time it shows up.</p>
+  </div>
+
+  <!-- ================= 0. WHY THIS IS HARD ================= -->
+  <section>
+    <div class="kicker">Before we start</div>
+    <h2>Why can't you just paste everything into ChatGPT?</h2>
+    <p>Imagine a set-top box crashes in a customer's living room. To figure out why, an engineer needs three completely different kinds of information:</p>
+    <div class="glossary" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="term" style="border-top:3px solid var(--code-color);">
+        <h4 style="color:var(--code-color);">📄 the code</h4>
+        <p>Millions of lines of C/C++ across dozens of repositories.</p>
+      </div>
+      <div class="term" style="border-top:3px solid var(--log-color);">
+        <h4 style="color:var(--log-color);">📊 the logs</h4>
+        <p>Millions of log lines a day, from thousands of devices.</p>
+      </div>
+      <div class="term" style="border-top:3px solid var(--doc-color);">
+        <h4 style="color:var(--doc-color);">📚 the docs</h4>
+        <p>Design specs, wikis, and a decade of old bug reports.</p>
+      </div>
+    </div>
+    <p>Each one is shaped differently, is searched differently, and grows at a different speed. Logs are millions of near-identical lines that need to be counted and filtered. Code needs to be understood by <em>structure</em> — which function calls which — not just by the words in it. Docs need to be searched by <em>meaning</em> — "why does the tuner drop signal" should find a page that never uses the word "tuner."</p>
+    <div class="callout">
+      <span class="label">Analogy</span>
+      It's like asking one person to be your librarian, your GPS, and your accountant at the same time. Each job needs a different tool. The trick isn't finding one tool that does everything — it's building three good tools and teaching an AI how to use all three together.
+    </div>
+  </section>
+
+  <!-- ================= 1. VOCABULARY ================= -->
+  <section>
+    <div class="kicker">Vocabulary first</div>
+    <h2>Six words you'll need</h2>
+    <p>These terms show up constantly in AI system design. Here's what they actually mean, with no jargon.</p>
+    <div class="glossary">
+      <div class="term">
+        <h4>LLM (Large Language Model)</h4>
+        <p>The "brain" — e.g., Claude or GPT. It's very good at reading text and reasoning about it, but it doesn't automatically know your codebase or your logs. You have to bring the right information to it.</p>
+      </div>
+      <div class="term">
+        <h4>Embedding</h4>
+        <p>A way of turning a piece of text (or code) into a list of numbers that captures its <em>meaning</em>. Two pieces of text about similar things end up with similar numbers, even if they don't share any words.</p>
+      </div>
+      <div class="term">
+        <h4>Vector database</h4>
+        <p>A database built to store those lists of numbers and quickly answer "which other stored items have numbers closest to this one?" — i.e., "find me the most similar things."</p>
+      </div>
+      <div class="term">
+        <h4>RAG (Retrieval-Augmented Generation)</h4>
+        <p>Instead of asking the AI to answer from memory, you first <em>retrieve</em> the relevant documents/logs/code, hand them to the AI as context, and then ask it to answer. This is how you stop the AI from guessing.</p>
+      </div>
+      <div class="term">
+        <h4>Knowledge graph</h4>
+        <p>A map of how things connect — "this commit touched this file," "this file belongs to this component," "this component logged this error." A graph answers connection questions; a vector database answers similarity questions.</p>
+      </div>
+      <div class="term">
+        <h4>Agent (tool-calling)</h4>
+        <p>An AI that doesn't just answer — it can take actions, like "search the logs," "look up this function," "run this query" — look at the result, and decide what to do next. This is what lets the AI investigate a bug instead of just guessing from one snapshot of context.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. THE THREE STREAMS OVERVIEW DIAGRAM ================= -->
+  <section>
+    <div class="kicker">The big picture</div>
+    <h2>Three streams, one investigator</h2>
+    <p>Here's the shape of the whole system before we zoom into each piece. Code, logs, and documents each get stored in the format that suits them best. An AI "agent" sits on top and pulls from all three when it investigates an issue.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg">
+        <!-- source boxes -->
+        <rect x="20" y="20" width="180" height="70" rx="8" fill="#E4F1EE" stroke="#1F6F63" stroke-width="1.5"/>
+        <text x="110" y="48" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#1F6F63">Source Code</text>
+        <text x="110" y="68" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#4A5260">C/C++ repositories</text>
+
+        <rect x="310" y="20" width="180" height="70" rx="8" fill="#E7EAF6" stroke="#3A4D8F" stroke-width="1.5"/>
+        <text x="400" y="48" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#3A4D8F">Device Logs</text>
+        <text x="400" y="68" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#4A5260">crashes, telemetry</text>
+
+        <rect x="600" y="20" width="180" height="70" rx="8" fill="#F7ECD9" stroke="#B8802E" stroke-width="1.5"/>
+        <text x="690" y="48" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#B8802E">Documents</text>
+        <text x="690" y="68" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#4A5260">specs, past bugs</text>
+
+        <!-- arrows down -->
+        <path d="M110 90 L110 130" stroke="#1F6F63" stroke-width="1.5" marker-end="url(#arrC)"/>
+        <path d="M400 90 L400 130" stroke="#3A4D8F" stroke-width="1.5" marker-end="url(#arrL)"/>
+        <path d="M690 90 L690 130" stroke="#B8802E" stroke-width="1.5" marker-end="url(#arrD)"/>
+
+        <!-- storage boxes -->
+        <rect x="20" y="135" width="180" height="65" rx="8" fill="#FFFFFF" stroke="#1F6F63" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <text x="110" y="160" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#161B22">Code graph +</text>
+        <text x="110" y="176" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#161B22">code search index</text>
+
+        <rect x="310" y="135" width="180" height="65" rx="8" fill="#FFFFFF" stroke="#3A4D8F" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <text x="400" y="160" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#161B22">Structured log</text>
+        <text x="400" y="176" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#161B22">store (fast search)</text>
+
+        <rect x="600" y="135" width="180" height="65" rx="8" fill="#FFFFFF" stroke="#B8802E" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <text x="690" y="160" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#161B22">Vector + keyword</text>
+        <text x="690" y="176" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#161B22">document index</text>
+
+        <!-- converge lines -->
+        <path d="M110 200 L110 240 Q110 260 150 260 L 350 260" stroke="#1F6F63" stroke-width="1.5" fill="none"/>
+        <path d="M400 200 L400 260" stroke="#3A4D8F" stroke-width="1.5" fill="none"/>
+        <path d="M690 200 L690 240 Q690 260 650 260 L450 260" stroke="#B8802E" stroke-width="1.5" fill="none"/>
+        <path d="M400 260 L400 280" stroke="#4A5260" stroke-width="1.5" marker-end="url(#arrK)"/>
+
+        <!-- knowledge graph / linking layer -->
+        <rect x="270" y="285" width="260" height="45" rx="8" fill="#161B22"/>
+        <text x="400" y="313" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#F5F6F3">shared IDs + knowledge graph</text>
+
+        <path d="M400 330 L400 350" stroke="#161B22" stroke-width="1.5" marker-end="url(#arrK)"/>
+
+        <!-- agent -->
+        <rect x="260" y="352" width="280" height="0" fill="none"/>
+        <circle cx="400" cy="360" r="0" fill="none"/>
+
+        <defs>
+          <marker id="arrC" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#1F6F63"/></marker>
+          <marker id="arrL" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#3A4D8F"/></marker>
+          <marker id="arrD" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#B8802E"/></marker>
+          <marker id="arrK" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#4A5260"/></marker>
+        </defs>
+      </svg>
+      <div class="cap">Each data type gets its own storage format — a shared ID system and a knowledge graph tie them together. An AI agent (next section) queries all three.</div>
+    </div>
+  </section>
+
+  <!-- ================= 3. LOGS ================= -->
+  <section>
+    <div class="stream-card log">
+      <div class="kicker" style="color:var(--log-color);">Data type 1 of 3</div>
+      <h3><span class="swatch log"></span> Device Logs</h3>
+      <p>A single set-top box can produce thousands of log lines a day. Across a fleet of a million devices, that's an unimaginable volume of near-identical text. Storing it as raw text and searching it like a Word document simply doesn't scale.</p>
+
+      <div class="callout log">
+        <span class="label">Analogy</span>
+        Imagine a security guard writing down every single time a door opens: "Door 4 opened at 9:01:03am. Door 4 opened at 9:01:47am. Door 7 opened at 9:02:01am." After a million entries, you don't want to <em>read</em> them — you want to know "how many times did Door 4 open today, and were any of those unusual?"
+      </div>
+
+      <h4>Step 1 — Turn messy text into templates</h4>
+      <p>The first trick is a technique called <strong>log templating</strong> (a popular tool for this is called <code>Drain3</code>). It looks at thousands of log lines and notices that most of them are the same sentence with different numbers plugged in:</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 800 190" xmlns="http://www.w3.org/2000/svg">
+          <text x="20" y="30" font-family="IBM Plex Mono" font-size="12" fill="#4A5260">Raw log lines coming off the device:</text>
+          <rect x="20" y="42" width="760" height="66" rx="6" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="34" y="62" font-family="IBM Plex Mono" font-size="11.5" fill="#161B22">09:14:02 [TUNER] signal lock lost on freq 615000000, retry 1</text>
+          <text x="34" y="80" font-family="IBM Plex Mono" font-size="11.5" fill="#161B22">09:14:19 [TUNER] signal lock lost on freq 615000000, retry 2</text>
+          <text x="34" y="98" font-family="IBM Plex Mono" font-size="11.5" fill="#161B22">09:15:47 [TUNER] signal lock lost on freq 803000000, retry 1</text>
+
+          <path d="M400 116 L400 140" stroke="#3A4D8F" stroke-width="1.5" marker-end="url(#arrL2)"/>
+          <text x="410" y="132" font-family="IBM Plex Mono" font-size="11" fill="#3A4D8F">Drain3 groups these</text>
+
+          <rect x="20" y="145" width="760" height="34" rx="6" fill="#E7EAF6" stroke="#3A4D8F"/>
+          <text x="34" y="167" font-family="IBM Plex Mono" font-size="12.5" fill="#3A4D8F">Template: [TUNER] signal lock lost on freq &lt;NUM&gt;, retry &lt;NUM&gt;   →  seen 41,208 times today</text>
+          <defs><marker id="arrL2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#3A4D8F"/></marker></defs>
+        </svg>
+        <div class="cap">Millions of raw lines collapse into a small, countable list of "log signatures."</div>
+      </div>
+
+      <p>Now instead of a mountain of text, you have a short list of named events with counts — something both a computer and a human can reason about ("this signature spiked 40x right after the last firmware update").</p>
+
+      <h4>Step 2 — Store it in a format built for counting, not for essays</h4>
+      <p>Logs get stored in what's called a <strong>columnar database</strong> (an example is <code>ClickHouse</code>) — think of it as a spreadsheet engine built to scan billions of rows in under a second, rather than a search engine built to find one needle in a haystack. This matches how logs are actually used: "count how often X happened, grouped by device model, over the last week."</p>
+
+      <table>
+        <tr><th>Option</th><th>What it's good at</th><th>Why it fits (or doesn't)</th></tr>
+        <tr><td><strong>Raw text files</strong></td><td>Nothing, at scale</td><td>No structure, slow, expensive to search</td></tr>
+        <tr><td><strong>Search engine</strong> (e.g. Elasticsearch)</td><td>Finding specific words in text</td><td>Good for "find the needle," worse at "count everything"</td></tr>
+        <tr><td><strong>Columnar database</strong> (e.g. ClickHouse)</td><td>Aggregating and counting huge volumes fast</td><td>Best fit for logs/telemetry at fleet scale</td></tr>
+      </table>
+
+      <h4>What if you only have one device, not a million?</h4>
+      <p>Everything above is built for fleet scale — but most investigations don't start at fleet scale. They start with one engineer, one crashing device, and a log file they just pulled over SSH. Standing up a streaming pipeline and a columnar database for that would be massive overkill.</p>
+      <p>The fix is to design the templating step as <strong>one portable tool with two modes</strong>, instead of building a separate "small" tool and a separate "big" tool:</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg">
+          <rect x="330" y="10" width="140" height="46" rx="8" fill="#161B22"/>
+          <text x="400" y="30" text-anchor="middle" font-family="IBM Plex Mono" font-size="11.5" fill="#F5F6F3">same templating</text>
+          <text x="400" y="45" text-anchor="middle" font-family="IBM Plex Mono" font-size="11.5" fill="#F5F6F3">engine</text>
+
+          <path d="M370 56 L190 110" stroke="#3A4D8F" stroke-width="1.5" marker-end="url(#arrH1)"/>
+          <path d="M430 56 L610 110" stroke="#3A4D8F" stroke-width="1.5" marker-end="url(#arrH1)"/>
+
+          <rect x="60" y="112" width="260" height="58" rx="8" fill="#E7EAF6" stroke="#3A4D8F"/>
+          <text x="190" y="134" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12.5" fill="#3A4D8F">Standalone mode</text>
+          <text x="190" y="152" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">1 device · a log file on disk</text>
+          <text x="190" y="166" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">no pipeline, no database</text>
+
+          <rect x="480" y="112" width="260" height="58" rx="8" fill="#E7EAF6" stroke="#3A4D8F"/>
+          <text x="610" y="134" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12.5" fill="#3A4D8F">Fleet mode</text>
+          <text x="610" y="152" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">1,000,000 devices · streaming</text>
+          <text x="610" y="166" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">into a columnar database</text>
+
+          <path d="M190 170 L190 200" stroke="#3A4D8F" stroke-width="1.5" marker-end="url(#arrH1)"/>
+          <path d="M610 170 L610 200" stroke="#3A4D8F" stroke-width="1.5" marker-end="url(#arrH1)"/>
+
+          <rect x="60" y="203" width="260" height="42" rx="6" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="190" y="228" text-anchor="middle" font-family="IBM Plex Mono" font-size="10.5" fill="#161B22">templates.json (one file)</text>
+
+          <rect x="480" y="203" width="260" height="42" rx="6" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="610" y="228" text-anchor="middle" font-family="IBM Plex Mono" font-size="10.5" fill="#161B22">ClickHouse (billions of rows)</text>
+
+          <path d="M270 245 Q400 280 530 245" stroke="#4A5260" stroke-width="1.3" fill="none" stroke-dasharray="3 3"/>
+          <text x="400" y="280" text-anchor="middle" font-family="Inter" font-style="italic" font-size="11.5" fill="#4A5260">same signature IDs on both sides — nothing has to be redone later</text>
+
+          <defs><marker id="arrH1" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#3A4D8F"/></marker></defs>
+        </svg>
+        <div class="cap">The same engine that runs continuously across a fleet can be pointed at a single log file for a one-off investigation — with no infrastructure and no format change.</div>
+      </div>
+
+      <div class="callout log">
+        <span class="label">Analogy</span>
+        Think of a recipe that scales — the same recipe works for a dinner for two or a restaurant kitchen feeding 500 people a night. You don't need a different recipe, just a bigger kitchen. The templating engine works the same way: same "recipe" for turning logs into patterns, whether it's reading one file on a laptop or a live stream from a million devices.
+      </div>
+
+      <h4>What to do instead of fleet statistics, when you only have a few devices</h4>
+      <p>With a fleet, you can ask "did this event spike after the last update?" With one or two devices, there's no fleet to compare against — so the useful trick becomes <strong>diffing</strong> instead of counting: run the same templating tool against a failing device's log and a healthy device's log, then compare the two short lists of templates instead of reading either log in full.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 800 190" xmlns="http://www.w3.org/2000/svg">
+          <rect x="30" y="20" width="330" height="60" rx="8" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="195" y="42" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12" fill="#161B22">Device A — rebooting</text>
+          <text x="195" y="60" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">templated → 14 templates found</text>
+
+          <rect x="440" y="20" width="330" height="60" rx="8" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="605" y="42" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12" fill="#161B22">Device B — healthy</text>
+          <text x="605" y="60" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">templated → 11 templates found</text>
+
+          <path d="M195 80 L195 110 Q195 120 250 120 L 350 120" stroke="#3A4D8F" stroke-width="1.4" fill="none"/>
+          <path d="M605 80 L605 110 Q605 120 550 120 L450 120" stroke="#3A4D8F" stroke-width="1.4" fill="none"/>
+          <path d="M400 120 L400 140" stroke="#4A5260" stroke-width="1.4" marker-end="url(#arrH2)"/>
+
+          <rect x="230" y="143" width="340" height="38" rx="8" fill="#F7ECD9" stroke="#B8802E"/>
+          <text x="400" y="167" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#B8802E">diff: 3 templates only in Device A — start there</text>
+
+          <defs><marker id="arrH2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#4A5260"/></marker></defs>
+        </svg>
+        <div class="cap">Diffing two short template lists finds the anomaly directly — no fleet-wide statistics required.</div>
+      </div>
+
+      <p>The key design promise is that this scales up cleanly: the same signature IDs produced during a small, ad-hoc investigation are the exact same IDs the fleet system would produce for the same event later — so nothing done at small scale is ever thrown away once a device population grows into a full fleet.</p>
+    </div>
+  </section>
+
+  <!-- ================= 4. CODE ================= -->
+  <section>
+    <div class="stream-card code">
+      <div class="kicker" style="color:var(--code-color);">Data type 2 of 3</div>
+      <h3><span class="swatch code"></span> Source Code</h3>
+      <p>Code is different from prose. What matters isn't just "what words are in this file" — it's <em>structure</em>: which function calls which, which file defines a symbol, and which commit last touched a given line.</p>
+
+      <div class="callout">
+        <span class="label">Analogy</span>
+        Searching code by keyword similarity is like trying to find a specific house by describing what its front door looks like. Searching code by structure is like using its actual street address. For debugging, you need the address — the exact function, the exact commit, the exact line — not just "something that looks similar."
+      </div>
+
+      <h4>Two complementary techniques</h4>
+      <ul>
+        <li><strong>Embeddings for code</strong> (semantic search): lets you ask "find code that handles HDMI reconnection" in plain English, even if you don't know the function name. Good for exploring.</li>
+        <li><strong>Precise code indexing</strong> (an example is a format/tool called <code>SCIP</code>, from Sourcegraph): this is compiler-accurate — it knows, with certainty, that <code>function A</code> calls <code>function B</code>, because it actually parsed the code the way a compiler would. Good for pinpointing.</li>
+      </ul>
+
+      <div class="diagram">
+        <svg viewBox="0 0 800 210" xmlns="http://www.w3.org/2000/svg">
+          <text x="20" y="26" font-family="IBM Plex Mono" font-size="12" fill="#4A5260">A crash points to a memory address inside a function...</text>
+          <rect x="20" y="36" width="230" height="50" rx="6" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="34" y="58" font-family="IBM Plex Mono" font-size="11" fill="#161B22">crash symbol:</text>
+          <text x="34" y="74" font-family="IBM Plex Mono" font-size="11" fill="#B24545">tuner_lock_retry()</text>
+
+          <path d="M250 61 L300 61" stroke="#1F6F63" stroke-width="1.5" marker-end="url(#arrC2)"/>
+
+          <rect x="305" y="36" width="230" height="50" rx="6" fill="#E4F1EE" stroke="#1F6F63"/>
+          <text x="319" y="58" font-family="IBM Plex Mono" font-size="11" fill="#1F6F63">defined in:</text>
+          <text x="319" y="74" font-family="IBM Plex Mono" font-size="10.5" fill="#161B22">drivers/tuner/lock.c:142</text>
+
+          <path d="M535 61 L585 61" stroke="#1F6F63" stroke-width="1.5" marker-end="url(#arrC2)"/>
+
+          <rect x="590" y="36" width="190" height="50" rx="6" fill="#E4F1EE" stroke="#1F6F63"/>
+          <text x="604" y="58" font-family="IBM Plex Mono" font-size="11" fill="#1F6F63">last changed by:</text>
+          <text x="604" y="74" font-family="IBM Plex Mono" font-size="10.5" fill="#161B22">commit a91f3c2</text>
+
+          <path d="M20 100 L780 100" stroke="#DDE1DA" stroke-width="1"/>
+
+          <text x="20" y="126" font-family="IBM Plex Mono" font-size="12" fill="#4A5260">...and the code graph shows what else touches that function:</text>
+          <circle cx="150" cy="170" r="26" fill="#E4F1EE" stroke="#1F6F63"/>
+          <text x="150" y="174" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#1F6F63">tuner_lock_retry</text>
+
+          <circle cx="330" cy="170" r="26" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="330" y="174" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#4A5260">retry_timer</text>
+
+          <circle cx="150" cy="70" r="0"/>
+          <circle cx="510" cy="170" r="26" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="510" y="174" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#4A5260">channel_scan</text>
+
+          <line x1="176" y1="170" x2="304" y2="170" stroke="#4A5260" stroke-width="1.2"/>
+          <line x1="356" y1="170" x2="484" y2="170" stroke="#4A5260" stroke-width="1.2"/>
+
+          <defs><marker id="arrC2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#1F6F63"/></marker></defs>
+        </svg>
+        <div class="cap">Precise code indexing turns a crash symbol into an exact file, line, and commit — then the code graph shows what's connected to it.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. DOCS ================= -->
+  <section>
+    <div class="stream-card doc">
+      <div class="kicker" style="color:var(--doc-color);">Data type 3 of 3</div>
+      <h3><span class="swatch doc"></span> Documents & Past Bug Reports</h3>
+      <p>This is the category people usually mean when they say "RAG." Design specs, wiki pages, and years of old bug tickets are unstructured text — the goal is to find the handful of paragraphs relevant to the issue at hand, out of tens of thousands of pages.</p>
+
+      <h4>How embeddings actually work, step by step</h4>
+      <div class="diagram">
+        <svg viewBox="0 0 800 230" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="220" height="60" rx="6" fill="#FFFFFF" stroke="#DDE1DA"/>
+          <text x="34" y="42" font-family="Inter" font-size="11" fill="#161B22">"HDMI drops after</text>
+          <text x="34" y="58" font-family="Inter" font-size="11" fill="#161B22">standby on model X200"</text>
+          <text x="34" y="76" font-family="IBM Plex Mono" font-size="9.5" fill="#4A5260">— old bug report</text>
+
+          <path d="M240 50 L290 50" stroke="#B8802E" stroke-width="1.5" marker-end="url(#arrD2)"/>
+          <text x="248" y="42" font-family="IBM Plex Mono" font-size="10" fill="#B8802E">embed</text>
+
+          <rect x="295" y="20" width="220" height="60" rx="6" fill="#F7ECD9" stroke="#B8802E"/>
+          <text x="309" y="45" font-family="IBM Plex Mono" font-size="10.5" fill="#B8802E">[0.12, -0.87, 0.44, ...]</text>
+          <text x="309" y="63" font-family="Inter" font-size="10.5" fill="#4A5260">a list of ~1000 numbers</text>
+
+          <path d="M405 82 L405 110" stroke="#B8802E" stroke-width="1.5" marker-end="url(#arrD2)"/>
+
+          <rect x="295" y="115" width="220" height="45" rx="6" fill="#F7ECD9" stroke="#B8802E" stroke-dasharray="3 3"/>
+          <text x="309" y="142" font-family="IBM Plex Mono" font-size="10.5" fill="#B8802E">stored in a vector database</text>
+
+          <text x="580" y="45" font-family="Inter" font-size="11" fill="#161B22" >New crash: "HDMI signal lost</text>
+          <text x="580" y="61" font-family="Inter" font-size="11" fill="#161B22">after sleep, box XR400"</text>
+          <path d="M580 75 L580 130" stroke="#B8802E" stroke-width="1.5" marker-end="url(#arrD2)"/>
+          <text x="588" y="105" font-family="IBM Plex Mono" font-size="10" fill="#B8802E">embed &amp;</text>
+          <text x="588" y="118" font-family="IBM Plex Mono" font-size="10" fill="#B8802E">compare</text>
+
+          <path d="M515 137 L560 137" stroke="#4A5260" stroke-width="1.2" stroke-dasharray="2 3"/>
+          <text x="330" y="200" font-family="Inter" font-style="italic" font-size="12" fill="#4A5260" text-anchor="middle">Even though no words match, the numbers land close together —</text>
+          <text x="330" y="218" font-family="Inter" font-style="italic" font-size="12" fill="#4A5260" text-anchor="middle">because both describe the same underlying problem.</text>
+
+          <defs><marker id="arrD2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#B8802E"/></marker></defs>
+        </svg>
+        <div class="cap">"HDMI drops after standby" and "HDMI signal lost after sleep" share almost no words — but an embedding still recognizes them as the same problem.</div>
+      </div>
+
+      <div class="callout doc">
+        <span class="label">Important nuance</span>
+        Embeddings are great at <em>meaning</em>, but surprisingly bad at <em>exact things</em> — an error code like <code>ERR_0x8004</code>, a parameter name, or a function name. For those, good old-fashioned keyword search (the technology behind most search engines, called <code>BM25</code>) actually wins. That's why real systems use <strong>both together</strong> — this is called <strong>hybrid search</strong>, covered next.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. HYBRID SEARCH ================= -->
+  <section>
+    <div class="kicker">Bringing search together</div>
+    <h2>Hybrid search: don't pick one</h2>
+    <p>A common mistake is assuming "AI search" means "vector search only." In practice, the best results come from running two (or three) searches at once and combining the results:</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 800 260" xmlns="http://www.w3.org/2000/svg">
+        <rect x="330" y="10" width="140" height="40" rx="20" fill="#161B22"/>
+        <text x="400" y="35" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#F5F6F3">the query</text>
+
+        <path d="M400 50 L200 100" stroke="#B8802E" stroke-width="1.5"/>
+        <path d="M400 50 L400 100" stroke="#3A4D8F" stroke-width="1.5"/>
+        <path d="M400 50 L600 100" stroke="#1F6F63" stroke-width="1.5"/>
+
+        <rect x="110" y="100" width="180" height="55" rx="8" fill="#F7ECD9" stroke="#B8802E"/>
+        <text x="200" y="122" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12" fill="#B8802E">Vector search</text>
+        <text x="200" y="140" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">finds similar meaning</text>
+
+        <rect x="310" y="100" width="180" height="55" rx="8" fill="#E7EAF6" stroke="#3A4D8F"/>
+        <text x="400" y="122" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12" fill="#3A4D8F">Keyword search</text>
+        <text x="400" y="140" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">finds exact terms</text>
+
+        <rect x="510" y="100" width="180" height="55" rx="8" fill="#E4F1EE" stroke="#1F6F63"/>
+        <text x="600" y="122" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12" fill="#1F6F63">Graph traversal</text>
+        <text x="600" y="140" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4A5260">finds connections</text>
+
+        <path d="M200 155 L370 195" stroke="#B8802E" stroke-width="1.5"/>
+        <path d="M400 155 L400 195" stroke="#3A4D8F" stroke-width="1.5"/>
+        <path d="M600 155 L430 195" stroke="#1F6F63" stroke-width="1.5"/>
+
+        <rect x="290" y="198" width="220" height="45" rx="8" fill="#161B22"/>
+        <text x="400" y="226" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#F5F6F3">combined, ranked results</text>
+      </svg>
+      <div class="cap">Three different search strategies run in parallel, then their results are merged into a single ranked list.</div>
+    </div>
+
+    <div class="callout">
+      <span class="label">Why this matters here</span>
+      A device error code, a TR-181 parameter name, or a function symbol needs an <em>exact</em> match. A vague description of symptoms needs <em>meaning</em>-based matching. A question like "what else in the codebase depends on this driver" needs the <em>graph</em>. Real triage questions are usually a mix of all three — so the search layer has to be too.
+    </div>
+  </section>
+
+  <!-- ================= 7. KNOWLEDGE GRAPH ================= -->
+  <section>
+    <div class="kicker">The connective tissue</div>
+    <h2>The knowledge graph: how everything gets linked</h2>
+    <p>Vector search and keyword search both answer "what looks similar to my query?" Neither one, on its own, can answer a question like "which recent commits touched the component that this crash came from?" That's a <em>relationship</em> question, and relationship questions are what a <strong>knowledge graph</strong> is for.</p>
+    <p>Think of it as a map with dots (called <strong>nodes</strong>) and lines connecting them (called <strong>edges</strong>). Each dot is a real thing — a commit, a file, a component, a type of log message, a past incident. Each line is a real relationship — "belongs to," "touched," "caused," "mentions."</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 800 260" xmlns="http://www.w3.org/2000/svg">
+        <line x1="150" y1="60" x2="330" y2="60" stroke="#4A5260" stroke-width="1.2"/>
+        <line x1="330" y1="60" x2="330" y2="170" stroke="#4A5260" stroke-width="1.2"/>
+        <line x1="330" y1="170" x2="150" y2="170" stroke="#4A5260" stroke-width="1.2"/>
+        <line x1="330" y1="170" x2="520" y2="170" stroke="#4A5260" stroke-width="1.2"/>
+        <line x1="520" y1="170" x2="650" y2="90" stroke="#4A5260" stroke-width="1.2"/>
+        <line x1="520" y1="170" x2="650" y2="220" stroke="#4A5260" stroke-width="1.2"/>
+
+        <circle cx="150" cy="60" r="34" fill="#E4F1EE" stroke="#1F6F63" stroke-width="1.5"/>
+        <text x="150" y="56" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#1F6F63">commit</text>
+        <text x="150" y="68" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#1F6F63">a91f3c2</text>
+
+        <circle cx="330" cy="60" r="34" fill="#E4F1EE" stroke="#1F6F63" stroke-width="1.5"/>
+        <text x="330" y="64" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#1F6F63">lock.c</text>
+
+        <circle cx="330" cy="170" r="36" fill="#FFFFFF" stroke="#161B22" stroke-width="1.5"/>
+        <text x="330" y="166" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#161B22">component:</text>
+        <text x="330" y="178" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#161B22">Tuner</text>
+
+        <circle cx="150" cy="170" r="34" fill="#E7EAF6" stroke="#3A4D8F" stroke-width="1.5"/>
+        <text x="150" y="166" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#3A4D8F">log signature</text>
+        <text x="150" y="178" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#3A4D8F">"lock lost"</text>
+
+        <circle cx="520" cy="170" r="36" fill="#F7ECD9" stroke="#B8802E" stroke-width="1.5"/>
+        <text x="520" y="166" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#B8802E">design doc:</text>
+        <text x="520" y="178" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#B8802E">tuner spec</text>
+
+        <circle cx="650" cy="90" r="30" fill="#FFFFFF" stroke="#161B22" stroke-width="1.5"/>
+        <text x="650" y="94" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#161B22">incident #4021</text>
+
+        <circle cx="650" cy="220" r="30" fill="#FFFFFF" stroke="#161B22" stroke-width="1.5"/>
+        <text x="650" y="216" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#161B22">incident</text>
+        <text x="650" y="228" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#161B22">#3877</text>
+
+        <text x="240" y="45" text-anchor="middle" font-family="Inter" font-style="italic" font-size="9.5" fill="#4A5260">modified</text>
+        <text x="70" y="120" text-anchor="middle" font-family="Inter" font-style="italic" font-size="9.5" fill="#4A5260">belongs to</text>
+        <text x="240" y="185" text-anchor="middle" font-family="Inter" font-style="italic" font-size="9.5" fill="#4A5260">emits</text>
+        <text x="425" y="185" text-anchor="middle" font-family="Inter" font-style="italic" font-size="9.5" fill="#4A5260">documented by</text>
+      </svg>
+      <div class="cap">A tiny slice of a knowledge graph. Follow the lines and you can answer: "this crash's log signature belongs to the Tuner component, which this commit modified, which is documented here, and has caused two prior incidents."</div>
+    </div>
+
+    <div class="callout">
+      <span class="label">Analogy</span>
+      A vector database is like asking "what does this remind you of?" A knowledge graph is like asking "what is this actually connected to?" You need both — one for fuzzy recall, one for hard facts.
+    </div>
+  </section>
+
+  <!-- ================= 8. THE ID SCHEMA (glue) ================= -->
+  <section>
+    <div class="kicker">The unglamorous but critical part</div>
+    <h2>What actually ties the three stores together</h2>
+    <p>None of this works unless every piece of data — a log line, a crash report, a commit, a document — is tagged with the same set of shared labels. This is the single most important design decision in the whole system, and it's the easiest one to skip.</p>
+    <table>
+      <tr><th>Shared label</th><th>Example value</th><th>Why it matters</th></tr>
+      <tr><td><code>firmware_build_id</code></td><td><code>RDKV-4.2.118</code></td><td>A crash can only be decoded using the debug symbols from the <em>exact</em> build that produced it</td></tr>
+      <tr><td><code>component</code></td><td><code>Tuner</code></td><td>Routes an issue to the right owning team and links logs to code and docs about the same subsystem</td></tr>
+      <tr><td><code>commit_sha</code></td><td><code>a91f3c2</code></td><td>Connects a code change to the incidents and log signatures that appeared after it shipped</td></tr>
+      <tr><td><code>log_signature_id</code></td><td><code>sig_00417</code></td><td>The stable "fingerprint" for a templated log message, from Step 1 of the logs section</td></tr>
+      <tr><td><code>device_model</code></td><td><code>XR400</code></td><td>Lets you see whether an issue is fleet-wide or limited to one hardware family</td></tr>
+    </table>
+    <p>If two systems disagree on what to call the same firmware build, or the same component, the AI can't connect them — no matter how good the search is underneath.</p>
+  </section>
+
+  <!-- ================= 9. THE AGENT ================= -->
+  <section>
+    <div class="kicker">Now add the investigator</div>
+    <h2>The AI agent: a detective, not a search bar</h2>
+    <p>Storing the data well is half the job. The other half is how the AI actually <em>uses</em> it. The pattern that works well is called an <strong>agent loop</strong> (sometimes called <strong>ReAct</strong>, short for "reason and act"): instead of answering in one shot, the AI is given a set of tools and allowed to investigate step by step, the way a person would.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="400" cy="120" r="95" fill="none" stroke="#DDE1DA" stroke-width="1.5" stroke-dasharray="4 4"/>
+
+        <rect x="330" y="10" width="140" height="40" rx="8" fill="#161B22"/>
+        <text x="400" y="35" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#F5F6F3">1. Think</text>
+
+        <rect x="600" y="100" width="150" height="40" rx="8" fill="#E4F1EE" stroke="#1F6F63"/>
+        <text x="675" y="125" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#1F6F63">2. Use a tool</text>
+
+        <rect x="330" y="190" width="140" height="40" rx="8" fill="#E7EAF6" stroke="#3A4D8F"/>
+        <text x="400" y="215" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#3A4D8F">3. Read result</text>
+
+        <rect x="50" y="100" width="150" height="40" rx="8" fill="#F7ECD9" stroke="#B8802E"/>
+        <text x="125" y="125" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#B8802E">4. Decide next step</text>
+
+        <path d="M470 30 Q650 45 665 100" stroke="#4A5260" stroke-width="1.3" fill="none" marker-end="url(#arrA)"/>
+        <path d="M655 140 Q550 200 470 205" stroke="#4A5260" stroke-width="1.3" fill="none" marker-end="url(#arrA)"/>
+        <path d="M330 210 Q170 200 140 140" stroke="#4A5260" stroke-width="1.3" fill="none" marker-end="url(#arrA)"/>
+        <path d="M135 100 Q150 45 330 30" stroke="#4A5260" stroke-width="1.3" fill="none" marker-end="url(#arrA)"/>
+        <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#4A5260"/></marker></defs>
+      </svg>
+      <div class="cap">The loop repeats — often 5 to 15 times — until the agent has enough evidence to state a root cause with confidence.</div>
+    </div>
+
+    <p>The "tools" in step 2 are exactly the storage systems described above, wrapped so the AI can call them:</p>
+    <div class="glossary">
+      <div class="term"><h4>search_logs()</h4><p>Query the log store for a signature, time range, or device model.</p></div>
+      <div class="term"><h4>symbolicate_crash()</h4><p>Turn a raw crash address into a function name, file, and line.</p></div>
+      <div class="term"><h4>search_code()</h4><p>Find relevant functions by meaning or by exact symbol.</p></div>
+      <div class="term"><h4>graph_query()</h4><p>Ask the knowledge graph a connection question.</p></div>
+      <div class="term"><h4>search_docs()</h4><p>Find relevant specs or past incident write-ups.</p></div>
+      <div class="term"><h4>blame_history()</h4><p>See which commits touched a file or function recently.</p></div>
+    </div>
+  </section>
+
+  <!-- ================= 10. WALKTHROUGH ================= -->
+  <section>
+    <div class="kicker">Seeing it all work together</div>
+    <h2>A worked example: chasing a real crash</h2>
+    <p>Say a set-top box, model <strong>XR400</strong>, running firmware <strong>RDKV-4.2.118</strong>, keeps rebooting a few minutes after standby. Here's what the agent loop above might actually do, end to end:</p>
+
+    <table>
+      <tr><th>#</th><th>Step</th><th>Source</th><th>What happens</th></tr>
+      <tr><td>1</td><td>Crash comes in</td><td><span class="badge log">logs</span></td><td>The device auto-uploads a crash dump, tagged with the firmware build ID and device model — the shared labels from Section 8.</td></tr>
+      <tr><td>2</td><td>Symbolicate</td><td><span class="badge code">code</span></td><td>The crash address resolves to <code>tuner_lock_retry()</code> at <code>drivers/tuner/lock.c:142</code>, using symbols that match build <code>RDKV-4.2.118</code> exactly.</td></tr>
+      <tr><td>3</td><td>Check history</td><td><span class="badge log">logs</span></td><td>This crash's log signature has spiked 40x in the last 3 days — right after the last firmware rollout.</td></tr>
+      <tr><td>4</td><td>Walk the code graph</td><td><span class="badge code">code</span></td><td>"What commits touched <code>lock.c</code> recently?" surfaces commit <code>a91f3c2</code> — "adjust retry backoff timing."</td></tr>
+      <tr><td>5</td><td>Pull related docs</td><td><span class="badge doc">docs</span></td><td>A hybrid search for "tuner retry standby" finds the tuner design spec and a two-year-old incident with the same symptom, even though it was worded as "reboot loop," not "crash."</td></tr>
+      <tr><td>6</td><td>Propose root cause</td><td>all three</td><td>The agent states a root cause and links every claim back to its source.</td></tr>
+    </table>
+
+    <div class="callout">
+      <span class="label">Final answer from the agent</span>
+      "This crash is very likely caused by commit <code>a91f3c2</code>, which changed retry timing in <code>tuner_lock_retry()</code>. It correlates with the timing of the firmware rollout, matches a log signature that spiked 40x, and resembles incident #3877 from two years ago. Recommend reviewing the backoff logic against the tuner spec." Each claim links back to its source, so an engineer can verify it in seconds instead of minutes.
+    </div>
+  </section>
+
+  <!-- ================= 11. BUILD VS BUY ================= -->
+  <section>
+    <div class="kicker">Getting practical</div>
+    <h2>Do we build this, or buy it?</h2>
+    <p>You don't need to build all of this from scratch. A sensible split:</p>
+    <table>
+      <tr><th>Layer</th><th>Practical approach</th></tr>
+      <tr><td>Log storage &amp; search</td><td>Buy / adopt an existing platform (there are strong open-source and commercial options) rather than build one</td></tr>
+      <tr><td>Code indexing</td><td>Adopt an existing code-intelligence tool rather than write your own parser for every language</td></tr>
+      <tr><td>Crash symbolication</td><td>Adopt an existing crash-reporting/symbolication service</td></tr>
+      <tr><td>The glue: shared IDs, the knowledge graph, the agent's tools</td><td><strong>Build this yourself</strong> — it's specific to your codebase, your device fleet, and your data, and no off-the-shelf product understands your embedded platform's quirks out of the box</td></tr>
+    </table>
+    <p>The unglamorous "glue" layer is where almost all of the real value lives, precisely because it's the one part nobody else can sell you pre-made.</p>
+  </section>
+
+  <!-- ================= 12. GLOSSARY QUICK REF ================= -->
+  <section>
+    <div class="kicker">Keep this handy</div>
+    <h2>Quick-reference glossary</h2>
+    <table>
+      <tr><th>Term</th><th>Plain-English meaning</th></tr>
+      <tr><td>Embedding</td><td>Text turned into a list of numbers that represents its meaning</td></tr>
+      <tr><td>Vector database</td><td>A database that finds "similar meaning" items fast</td></tr>
+      <tr><td>RAG</td><td>Fetch the relevant information first, then let the AI answer using it</td></tr>
+      <tr><td>Knowledge graph</td><td>A map of how things (commits, files, incidents) connect to each other</td></tr>
+      <tr><td>Hybrid search</td><td>Running meaning-search and exact-word-search together and merging results</td></tr>
+      <tr><td>Log templating</td><td>Collapsing millions of similar log lines into a short list of patterns</td></tr>
+      <tr><td>Symbolication</td><td>Turning a raw crash memory address into a readable function name and line</td></tr>
+      <tr><td>Hybrid / scale-agnostic model</td><td>The same tool works standalone on a single device or continuously across a fleet, without a redesign</td></tr>
+      <tr><td>Agent / tool-calling</td><td>An AI that can take investigative actions and read the results before answering</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    A beginner-friendly companion to the full Requirements Specification and Reference Architecture report.
+  </footer>
+
+</div>
+</body>
+</html>

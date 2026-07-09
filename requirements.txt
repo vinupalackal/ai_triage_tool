@@ -1,0 +1,7 @@
+streamlit
+duckdb
+pandas
+requests
+pypdf
+beautifulsoup4
+gitpython
