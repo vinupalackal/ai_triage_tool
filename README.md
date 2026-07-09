@@ -15,9 +15,15 @@ under [`docs/`](docs/). Start there for the *why*; this README covers the
 |---|---|---|
 | Ingestion (code, logs, docs — local and remote sources) | **Implemented** | [`ingestion/`](ingestion/) |
 | Tracking (shared artifact schema over DuckDB) | **Implemented** | [`utils/storage.py`](utils/storage.py) |
+| Investigate UI (question box, wired to the real agent interface) | **Implemented — UI only** | [`app.py`](app.py), "Investigate" tab |
 | Indexing (log templating, code chunking, doc embedding) | Designed, not yet built | [`indexing/`](indexing/) — stubs raise `NotImplementedError` |
 | Retrieval (hybrid vector + keyword + graph search) | Designed, not yet built | [`retrieval/`](retrieval/) — stubs raise `NotImplementedError` |
 | Agent (Claude tool-calling investigation loop) | Designed, not yet built | [`agent/`](agent/) — stubs raise `NotImplementedError` |
+
+The "Investigate" tab in the running app calls the real `agent.loop.investigate()`
+interface today — it currently surfaces a clear "not yet built" message
+instead of an answer, plus the six tools the agent will use once it's wired
+up, so the app's visible shape already matches its full intended scope.
 
 The stub modules aren't placeholders in the "TODO" sense — their function
 signatures, inputs, and outputs are the actual interface contract defined in
@@ -65,7 +71,7 @@ design → code.
 ## Repository layout
 
 ```
-app.py                  Streamlit entry point (3 ingestion tabs + artifact browser)
+app.py                  Streamlit entry point (3 ingestion tabs, Investigate tab, artifact browser)
 ingestion/               Implemented — provisions code, logs, and docs
   code_ingest.py           local folder OR git URL (clones)
   log_ingest.py            local folder OR Jira issue URL (downloads attachments)
@@ -85,6 +91,7 @@ agent/                    Designed, not yet built — see docs/design, Section 3
   tools.py                 the 6-tool contract matching AI-FR-061 exactly
   loop.py                  the reason -> act -> observe investigation loop
 tests/                   pytest suite for everything currently implemented
+  test_app.py               AppTest-based smoke tests for the Streamlit UI itself
 docs/                    the five documents listed above
 .github/workflows/ci.yml  compile-check + test on every push/PR
 ```

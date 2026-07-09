@@ -1,7 +1,7 @@
 """
 app.py
 
-Streamlit POC — data ingestion screen.
+Streamlit MVP — data ingestion + investigation screen.
 
 Provisions the three data types from the requirements spec (Section 4) into
 local storage, each from either a local path or a remote source:
@@ -10,9 +10,12 @@ local storage, each from either a local path or a remote source:
   Logs         -> local folder  OR  Jira issue URL (attachments downloaded)
   Documents    -> uploaded PDF/Markdown files  OR  a URL (PDF/MD/HTML fetched)
 
-This screen only handles provisioning. Indexing (templating, embeddings,
-the knowledge graph) and the agent are separate, later pieces that read
-from what's tracked here via utils.storage.
+The "Investigate" tab is the front door to the agent layer designed in the
+High-Level Design (Section 3.5) — it calls the real agent.loop.investigate()
+interface, which currently raises NotImplementedError until the indexing
+and retrieval layers underneath it are built. This tab exists so the app's
+visible shape matches its full intended scope, not just the ingestion slice
+that happens to be implemented first.
 """
 
 import streamlit as st
@@ -21,13 +24,16 @@ from ingestion.code_ingest import ingest_local_code_folder, ingest_code_from_git
 from ingestion.log_ingest import ingest_local_log_folder, ingest_logs_from_jira
 from ingestion.doc_ingest import ingest_uploaded_files, ingest_doc_from_url
 from utils.storage import list_artifacts, artifact_counts
+from agent.tools import TOOL_DEFINITIONS
+from agent.loop import investigate
 
-st.set_page_config(page_title="Triage POC — Data Ingestion", layout="wide")
+st.set_page_config(page_title="Triage MVP", layout="wide")
 
-st.title("Triage POC — data ingestion")
+st.title("Triage MVP")
 st.caption(
     "Feed source code, logs, and documents from either a local path or a "
-    "remote source. Everything ingested here is tracked in one place, "
+    "remote source, then ask a question and get an AI-proposed root cause "
+    "with citations. Everything ingested is tracked in one place, "
     "regardless of where it came from."
 )
 
@@ -37,8 +43,8 @@ c1.metric("Code files", counts.get("code", 0))
 c2.metric("Log files", counts.get("log", 0))
 c3.metric("Documents", counts.get("document", 0))
 
-tab_code, tab_logs, tab_docs, tab_browse = st.tabs(
-    ["Source code", "Logs", "Documents", "Ingested artifacts"]
+tab_code, tab_logs, tab_docs, tab_investigate, tab_browse = st.tabs(
+    ["Source code", "Logs", "Documents", "Investigate", "Ingested artifacts"]
 )
 
 # ----------------------------------------------------------------------
@@ -210,8 +216,65 @@ with tab_docs:
                     st.error(str(e))
 
 # ----------------------------------------------------------------------
-# BROWSE WHAT'S BEEN INGESTED
+# INVESTIGATE  (agent layer — designed, not yet built)
 # ----------------------------------------------------------------------
+with tab_investigate:
+    st.subheader("Ask a question")
+    st.caption(
+        "This calls the real agent interface designed in the High-Level "
+        "Design (Section 3.5) — it isn't wired up to working indexing and "
+        "retrieval yet, so it will tell you that rather than return an "
+        "answer. The shape below is what it will look like once built."
+    )
+
+    total_artifacts = sum(counts.values())
+    if total_artifacts == 0:
+        st.warning(
+            "Nothing has been ingested yet — add source code, logs, or "
+            "documents in the tabs above before running an investigation."
+        )
+
+    question = st.text_area(
+        "Question",
+        placeholder=(
+            "Why does the XR400 reboot a few minutes after standby on "
+            "firmware RDKV-4.2.118?"
+        ),
+        key="investigate_question",
+    )
+
+    if st.button("Run investigation", key="investigate_btn", type="primary"):
+        if not question:
+            st.warning("Enter a question first.")
+        else:
+            try:
+                with st.spinner("Investigating..."):
+                    result = investigate(question)
+                # This branch is unreachable until agent.loop.investigate is
+                # implemented, but is written now so wiring up real results
+                # later is a matter of filling this in, not designing it.
+                st.success("Proposed root cause")
+                st.write(result.proposed_root_cause)
+                st.caption(f"Cited artifacts: {result.cited_artifact_ids}")
+            except NotImplementedError:
+                st.info(
+                    "The agent layer is designed but not yet built — see "
+                    "`docs/design/Triage_MVP_High_Level_Design.docx`, "
+                    "Section 3.5, and `agent/loop.py`. Once the indexing "
+                    "and retrieval layers are implemented, this button "
+                    "will run the full investigation loop below."
+                )
+
+    with st.expander("What this will do, once built"):
+        st.markdown(
+            "The agent runs a **reason → act → observe** loop against your "
+            "question, calling these tools as needed and citing exactly "
+            "what it used to reach its answer:"
+        )
+        for tool in TOOL_DEFINITIONS:
+            st.markdown(f"- **{tool['name']}** — {tool['description']}")
+
+
 with tab_browse:
     st.subheader("Everything ingested so far")
     filter_type = st.selectbox(
