@@ -8,6 +8,10 @@ Provisions source code into the POC from either:
 Every ingested file is recorded via utils.storage so downstream indexing
 (AI-FR-010 style precise indexing, or a simple embedding pass) has a
 consistent list to work from, regardless of how the code arrived.
+
+Supports Generic Issue Triage Skill Step 1 (Orient to Artifacts):
+Collects source code from user-specified sources and makes it available for
+analysis and code-path navigation during investigation.
 """
 
 import shutil

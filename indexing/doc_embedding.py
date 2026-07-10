@@ -8,6 +8,10 @@ Chunks documents at semantic (paragraph/section) boundaries with overlap and
 embeds each chunk with a local sentence-transformers model — no external API
 call, keeping indexing free and offline-capable. Writes results to the
 `doc_chunks` table via `utils.storage`.
+
+Supports Generic Issue Triage Skill Steps 2–4 (Define, Classify, Correlate):
+Extracts semantic chunks so design intent, past incidents, and documented
+anomalies can be retrieved and cross-checked when characterizing root cause.
 """
 
 from .models import DocChunk

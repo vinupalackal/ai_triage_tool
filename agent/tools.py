@@ -9,6 +9,15 @@ Claude API, and dispatches a tool-call request to the right underlying
 module. This tool set is deliberately identical to AI-FR-061 in the
 Requirements Specification — see the HLD's note in Section 3.5 on why this
 is a direct implementation of that contract, not a simplified variant.
+
+These tools implement the Generic Issue Triage Skill (docs/guides/Generic_Issue_Triage_Skill.md)
+Steps 4–5 (Correlate and Navigate to Code):
+  - search_logs    → Skill Step 4: Correlate logs with anomaly window
+  - search_code    → Skill Step 5: Navigate to potentially responsible code
+  - search_docs    → Skill Step 4: Correlate with design specs and past incidents
+  - graph_query    → Skill Step 4: Trace artifact relationships and dependencies
+  - blame_history  → Skill Step 5: Find commits touching affected code
+  - symbolicate_crash → Skill Step 5: Resolve crash to precise function/line
 """
 
 # Tool definitions in Claude API tool-use schema shape. Each "input_schema"
@@ -17,7 +26,7 @@ is a direct implementation of that contract, not a simplified variant.
 TOOL_DEFINITIONS = [
     {
         "name": "search_logs",
-        "description": "Query log signatures by frequency, device, or firmware build.",
+        "description": "Query log signatures by frequency, device, or firmware build. [Skill Step 4: Correlate] Identify patterns in logs within the anomaly window.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -30,7 +39,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "symbolicate_crash",
-        "description": "Resolve a crash address to function/file/line for an exact firmware build.",
+        "description": "Resolve a crash address to function/file/line for an exact firmware build. [Skill Step 5: Navigate] Pinpoint the exact location of a crash.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -42,7 +51,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "search_code",
-        "description": "Hybrid search over code symbols by meaning or exact symbol name.",
+        "description": "Hybrid search over code symbols by meaning or exact symbol name. [Skill Step 5: Navigate] Find potentially responsible functions and their context.",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string"}},
@@ -51,7 +60,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "graph_query",
-        "description": "Traverse the knowledge graph using one of the supported query shapes.",
+        "description": "Traverse the knowledge graph using one of the supported query shapes. [Skill Step 4: Correlate] Follow relationships: commit→file→component→log signature→document.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -63,7 +72,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "search_docs",
-        "description": "Hybrid search over document chunks (specs, past incidents).",
+        "description": "Hybrid search over document chunks (specs, past incidents). [Skill Step 4: Correlate] Find design intent, past similar issues, and documented anomalies.",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string"}},
@@ -72,7 +81,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "blame_history",
-        "description": "Return commit history for a file or function.",
+        "description": "Return commit history for a file or function. [Skill Step 5: Navigate] Trace recent changes to identify potential root-cause commit.",
         "input_schema": {
             "type": "object",
             "properties": {

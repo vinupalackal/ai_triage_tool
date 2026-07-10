@@ -7,6 +7,11 @@ POC-scale stand-in for the "shared identifier schema" (Section 8.2 of the
 requirements spec) — every artifact gets a consistent record so later
 retrieval/agent code has one place to look, whether the artifact is source
 code, a log file, or a document.
+
+Supports Generic Issue Triage Skill Step 1 (Orient to Artifacts):
+Builds and maintains the unified artifact index used to navigate logs, code,
+and documents as a cohesive corpus during investigation. Component tagging
+enables Step 1's "organize by component" substep.
 """
 
 import duckdb

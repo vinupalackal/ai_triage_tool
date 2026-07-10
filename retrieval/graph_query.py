@@ -8,6 +8,11 @@ Wraps a NetworkX in-memory graph built from the graph_edges table, exposing
 a small, fixed set of traversal shapes rather than an arbitrary query
 language — sufficient for the MVP's needs per the design decision recorded
 in HLD Section 8 (NetworkX vs. embedding graph edges directly in DuckDB).
+
+Supports Generic Issue Triage Skill Step 4 (Correlate Logs & External Events):
+Traverses relationships (commit→file→component, component→log signature,
+document→component, etc.) to identify correlations and validate root-cause
+hypotheses against the artifact dependency graph.
 """
 
 from .models import GraphPath

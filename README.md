@@ -5,21 +5,25 @@ devices (set-top boxes, gateways, cable modems, ONTs), and correlating
 source code, logs, and documents so an AI agent can propose a root cause
 with citations.
 
+The system implements the **Generic Issue Triage Skill** (see [docs/guides/Generic_Issue_Triage_Skill.md](docs/guides/Generic_Issue_Triage_Skill.md))
+— a systematic 7-step framework for investigating any behavioral anomaly by correlating
+evidence, classifying the issue, and navigating to root cause. Each system layer supports
+one or more skill steps, as shown in the Status table below.
+
 This repository is the MVP implementation described in the design documents
 under [`docs/`](docs/). Start there for the *why*; this README covers the
 *how to run it*.
 
-## Status
+## Status and Skill Alignment
 
-| Layer | Status | Where |
-|---|---|---|
-| Ingestion (code, logs, docs — local and remote sources) | **Implemented** | [`ingestion/`](ingestion/) |
-| Tracking (shared artifact schema over DuckDB) | **Implemented** | [`utils/storage.py`](utils/storage.py) |
-| Component tagging + component → code/document map + ingestion cache | **Implemented** | [`utils/storage.py`](utils/storage.py), "Components" tab |
-| Investigate UI (question box, wired to the real agent interface) | **Implemented — UI only** | [`app.py`](app.py), "Investigate" tab |
-| Indexing (log templating, code chunking, doc embedding) | Designed, not yet built | [`indexing/`](indexing/) — stubs raise `NotImplementedError` |
-| Retrieval (hybrid vector + keyword + graph search) | Designed, not yet built | [`retrieval/`](retrieval/) — stubs raise `NotImplementedError` |
-| Agent (Claude tool-calling investigation loop) | Designed, not yet built | [`agent/`](agent/) — stubs raise `NotImplementedError` |
+| Layer | Status | Where | Supports Skill Steps |
+|---|---|---|---|
+| Ingestion (code, logs, docs — local and remote sources) | **Implemented** | [`ingestion/`](ingestion/) | **Step 1** — Orient to artifacts (collect logs, code, docs) |
+| Tracking (shared artifact schema over DuckDB) | **Implemented** | [`utils/storage.py`](utils/storage.py) | **Step 1** — Build unified artifact index |
+| Component tagging + component → code/document map + ingestion cache | **Implemented** | [`utils/storage.py`](utils/storage.py), "Components" tab | **Step 1** — Organize artifacts by component |
+| Indexing (log templating, code chunking, doc embedding) | Designed, not yet built | [`indexing/`](indexing/) — stubs raise `NotImplementedError` | **Steps 2–3** — Extract patterns; enable window/anomaly classification |
+| Retrieval (hybrid vector + keyword + graph search) | Designed, not yet built | [`retrieval/`](retrieval/) — stubs raise `NotImplementedError` | **Step 4** — Correlate logs, code, docs; traverse relationships |
+| Agent (Claude tool-calling investigation loop) | Designed, not yet built | [`agent/`](agent/) — stubs raise `NotImplementedError` | **Steps 5–7** — Navigate code, characterize cause, validate against design |
 
 The "Investigate" tab in the running app calls the real `agent.loop.investigate()`
 interface today — it currently surfaces a clear "not yet built" message
@@ -84,6 +88,7 @@ CI (`.github/workflows/ci.yml`) runs the fast suite on every push and PR.
 | [Requirements Detail & Rationale](docs/requirements/Requirements_Detail_and_Rationale.docx) | Plain-language explanation and a worked example for every requirement |
 | [Architecture Document](docs/architecture/Triage_MVP_Architecture_Document.docx) | System shape — technology choices per layer, deployment model, MVP vs. post-MVP boundary |
 | [High-Level Design](docs/design/Triage_MVP_High_Level_Design.docx) | Module interfaces, data schemas, key workflows — the design this code implements |
+| [Generic Issue Triage Skill](docs/guides/Generic_Issue_Triage_Skill.md) | Systematic 7-step framework for investigating **any** behavioral anomaly (hangs, crashes, resource spikes, race conditions, etc.) |
 | [AI Triage: A Beginner's Guide](docs/guides/AI_Triage_Beginners_Guide.pdf) | A plain-English, illustrated walkthrough of the whole approach, for anyone new to the project |
 
 Read them in that order if you're new here: requirements → architecture →
@@ -124,6 +129,18 @@ The next implementation milestone is the **indexing layer** — nothing in
 `log_signatures`, `code_symbols`, and `doc_chunks` tables they read from.
 Each stub module's docstring points at the exact HLD section and requirement
 IDs it implements; start there rather than re-deriving the design.
+
+### Grounded response checklist (avoid over-claiming)
+
+Before describing system capabilities in docs, PRs, or AI responses:
+
+1. Classify each claim as **Implemented now**, **Designed/planned**, or **Deferred/post-MVP**.
+2. Treat runnable code as source of truth over aspirational architecture text.
+3. Do not describe `NotImplementedError` paths as operational.
+4. If answering "does it do X?", lead with a direct yes/no status and classification.
+5. For AI responses, follow the repo rules in `.github/copilot-instructions.md`.
+
+Grounding reference: `docs/guides/Agent_Grounded_Context.md`.
 
 ## License
 

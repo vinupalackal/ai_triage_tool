@@ -8,6 +8,10 @@ Chunks source files at function boundaries (tree-sitter is the intended
 implementation basis, matching the embedded C/C++ codebases this system is
 designed around) and extracts per-file/function commit history via
 GitPython. Writes results to the `code_symbols` table via `utils.storage`.
+
+Supports Generic Issue Triage Skill Steps 2–3 (Define & Classify):
+Extracts code structure so functions and their recent changes can be
+navigated when tracing from symptom to responsible code location.
 """
 
 from .models import CodeChunk, Commit

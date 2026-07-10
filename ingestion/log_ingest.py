@@ -9,6 +9,10 @@ Provisions logs into the POC from either:
 This intentionally mirrors the "standalone mode" requirement from the spec
 (AI-FR-007 / A.1.1): no fleet telemetry pipeline is assumed. You point it at
 whatever handful of log sources you have for a given investigation.
+
+Supports Generic Issue Triage Skill Step 1 (Orient to Artifacts):
+Collects device logs from user-specified sources and makes them available for
+anomaly-window definition and pattern search during investigation.
 """
 
 import re

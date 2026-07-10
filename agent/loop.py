@@ -16,6 +16,14 @@ returns, which the caller persists to the agent_investigations table
 (HLD Section 4.2) — this is what makes citations machine-checkable
 (AI-FR-063) rather than free text, and what the confirmed/rejected
 feedback (AI-FR-065) attaches to.
+
+This loop implements the Generic Issue Triage Skill (docs/guides/Generic_Issue_Triage_Skill.md)
+Steps 3–7 via the reason → act → observe pattern:
+  - Step 3 (Classify Anomaly): Agent reasoning over log/code/doc patterns
+  - Step 4 (Correlate): Tool calls to search_logs, search_docs, graph_query
+  - Step 5 (Navigate to Code): Tool calls to search_code, blame_history, symbolicate_crash
+  - Step 6 (Characterize): Agent synthesis of evidence into root-cause hypothesis
+  - Step 7 (Validate): Agent cross-checks against design docs via search_docs
 """
 
 from dataclasses import dataclass, field

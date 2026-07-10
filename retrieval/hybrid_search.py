@@ -10,6 +10,10 @@ rank_bm25 keyword search over the same text, and — where the query names a
 known artifact — a one-hop graph_edges lookup. See design_decisions in the
 High-Level Design (Section 8) for why RRF was chosen over weighted score
 averaging.
+
+Supports Generic Issue Triage Skill Step 4 (Correlate Logs & External Events):
+Emerges matched patterns across code, logs, and documents, enabling the agent
+to cross-reference symptoms with root-cause evidence and design context.
 """
 
 from .models import SearchResult

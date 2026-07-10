@@ -13,6 +13,10 @@ This module intentionally has no implementation yet — the function
 signatures below are the interface contract other modules (retrieval,
 agent) are designed against, per the HLD. Implementing this module is
 the next milestone toward completing the MVP.
+
+Supports Generic Issue Triage Skill Steps 2–3 (Define Anomaly Window & Classify Anomaly):
+Extracts log patterns so anomaly windows can be identified by searching for
+template frequency spikes and correlating with anomalies observed in other logs.
 """
 
 from .models import LogTemplate

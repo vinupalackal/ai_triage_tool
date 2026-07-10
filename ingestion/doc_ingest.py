@@ -9,6 +9,11 @@ Provisions documents into the POC from either:
 Extracted text is saved alongside the original so a later embedding/RAG
 step (AI-FR-020) has clean text to chunk, without needing to re-parse
 PDFs or HTML every time.
+
+Supports Generic Issue Triage Skill Step 1 (Orient to Artifacts):
+Collects design specs, documentation, and historical incident reports,
+making them available for design-intent validation and pattern recognition
+during investigation.
 """
 
 from pathlib import Path
